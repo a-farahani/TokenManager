@@ -2,6 +2,8 @@
 
 A Python-based GUI application for managing PKCS#11 tokens using `tkinter`. Features include detecting tokens, logging in, generating RSA key pairs, creating Certificate Signing Requests (CSRs), importing X.509 certificates, and listing token objects.
 
+![Token Manager](images/token_manager_screenshot.png)
+
 ## Features
 
 - **Detect Token**: Locate and select PKCS#11 tokens.
