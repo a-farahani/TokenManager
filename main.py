@@ -236,17 +236,100 @@ class TokenManagerApp:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
 
 
-    def list_objects(self):
+    def format_object_details(self, obj):
+        """Format details of a PKCS#11 object for display."""
         try:
-            # Clear the listbox before listing new objects
+            obj_class = obj[pkcs11.Attribute.CLASS]
+            label = obj[pkcs11.Attribute.LABEL]
+            obj_type = "Unknown"
+
+            if obj_class == pkcs11.ObjectClass.PUBLIC_KEY:
+                obj_type = "Public Key Object"
+                key_type = obj[pkcs11.Attribute.KEY_TYPE]
+                bits = obj[pkcs11.Attribute.MODULUS_BITS] if key_type == KeyType.RSA else 'N/A'
+                usage_flags = []
+
+                # Check each usage flag
+                try:
+                    if obj[pkcs11.Attribute.ENCRYPT]:
+                        usage_flags.append("encrypt")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.WRAP]:
+                        usage_flags.append("wrap")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.VERIFY]:
+                        usage_flags.append("verify")
+                except KeyError:
+                    pass
+
+                usage = ', '.join(usage_flags)
+                access = 'local' if obj[pkcs11.Attribute.TOKEN] else 'session'
+
+                return (f"{obj_type}; Algorithm: {key_type.name}, Bits: {bits}\n"
+                        f"  label:      {label}\n"
+                        f"  Usage:      {usage}\n"
+                        f"  Access:     {access}")
+
+            elif obj_class == pkcs11.ObjectClass.PRIVATE_KEY:
+                obj_type = "Private Key Object"
+                key_type = obj[pkcs11.Attribute.KEY_TYPE]
+                usage_flags = []
+
+                # Check each usage flag
+                try:
+                    if obj[pkcs11.Attribute.DECRYPT]:
+                        usage_flags.append("decrypt")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.SIGN]:
+                        usage_flags.append("sign")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.UNWRAP]:
+                        usage_flags.append("unwrap")
+                except KeyError:
+                    pass
+
+                usage = ', '.join(usage_flags)
+                access = 'sensitive, always sensitive, never extractable' if obj[pkcs11.Attribute.SENSITIVE] else 'local'
+
+                return (f"{obj_type}; Algorithm: {key_type.name}\n"
+                        f"  label:      {label}\n"
+                        f"  Usage:      {usage}\n"
+                        f"  Access:     {access}")
+
+            elif obj_class == pkcs11.ObjectClass.CERTIFICATE:
+                obj_type = "Certificate Object"
+                cert_type = obj[pkcs11.Attribute.CERTIFICATE_TYPE]
+                subject = obj[pkcs11.Attribute.SUBJECT]
+                # Assuming subject is a bytes object and needs to be decoded
+                subject_dn = subject.decode('utf-8') if isinstance(subject, bytes) else subject
+                
+                return (f"{obj_type}; type = {cert_type.name}\n"
+                        f"  label:      {label}\n"
+                        f"  subject:    DN: {subject_dn}")
+
+            else:
+                return f"Unknown Object Class: {obj_class}"
+        except KeyError as e:
+            return f"Missing attribute: {e}"
+
+    # Example usage in list_objects
+    def list_objects(self):
+        # try:
             self.objects_listbox.delete(0, tk.END)
 
             for obj in self.session.get_objects():
-                label = obj[pkcs11.Attribute.LABEL]
-                obj_class = obj[pkcs11.Attribute.CLASS]
-                self.objects_listbox.insert(tk.END, f"{label} - {obj_class}")
-        except pkcs11.PKCS11Error as e:
-            messagebox.showerror("Error", f"Failed to list objects: {str(e)}")
+                details = self.format_object_details(obj)
+                self.objects_listbox.insert(tk.END, details)
+        # except pkcs11.PKCS11Error as e:
+        #     messagebox.showerror("Error", f"Failed to list objects: {str(e)}")
 
 if __name__ == "__main__":
     root = tk.Tk()
