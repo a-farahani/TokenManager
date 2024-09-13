@@ -4,7 +4,7 @@ import pkcs11
 from pkcs11 import KeyType, Mechanism
 import pkcs11.util.rsa
 from cryptography import x509
-from asn1crypto import csr, keys, x509
+from asn1crypto import csr, keys, x509 as ac_x509
 from asn1crypto.keys import RSAPublicKey
 from asn1crypto import pem
 from pkcs11.util.x509 import decode_x509_certificate
@@ -16,30 +16,30 @@ class TokenManagerApp:
 
         # Label to display token status
         self.token_label = tk.Label(root, text="Token Not Detected")
-        self.token_label.pack(pady=10)
+        self.token_label.grid(row=0, column=0, columnspan=3, pady=10)
 
         # Buttons for various operations
-        self.detect_token_button = tk.Button(root, text="Detect Token", command=self.detect_token)
-        self.detect_token_button.pack(pady=5)
+        self.detect_token_button = tk.Button(root, text="Detect Token", command=self.detect_token, width=20)
+        self.detect_token_button.grid(row=1, column=0, padx=5, pady=5)
 
-        self.login_button = tk.Button(root, text="Login", command=self.login_token, state=tk.DISABLED)
-        self.login_button.pack(pady=5)
+        self.login_button = tk.Button(root, text="Login", command=self.login_token, state=tk.DISABLED, width=20)
+        self.login_button.grid(row=2, column=0, padx=5, pady=5)
 
-        self.generate_key_button = tk.Button(root, text="Generate Key", command=self.generate_key, state=tk.DISABLED)
-        self.generate_key_button.pack(pady=5)
+        self.generate_key_button = tk.Button(root, text="Generate Key", command=self.generate_key, state=tk.DISABLED, width=20)
+        self.generate_key_button.grid(row=1, column=1, padx=5, pady=5)
 
-        self.generate_csr_button = tk.Button(root, text="Generate CSR", command=self.generate_csr, state=tk.DISABLED)
-        self.generate_csr_button.pack(pady=5)
+        self.generate_csr_button = tk.Button(root, text="Generate CSR", command=self.generate_csr, state=tk.DISABLED, width=20)
+        self.generate_csr_button.grid(row=2, column=1, padx=5, pady=5)
 
-        self.import_cert_button = tk.Button(root, text="Import Certificate", command=self.import_cert, state=tk.DISABLED)
-        self.import_cert_button.pack(pady=5)
+        self.import_cert_button = tk.Button(root, text="Import Certificate", command=self.import_cert, state=tk.DISABLED, width=20)
+        self.import_cert_button.grid(row=1, column=2, padx=5, pady=5)
 
-        self.list_objects_button = tk.Button(root, text="List Objects", command=self.list_objects, state=tk.DISABLED)
-        self.list_objects_button.pack(pady=5)
+        self.list_objects_button = tk.Button(root, text="List Objects", command=self.list_objects, state=tk.DISABLED, width=20)
+        self.list_objects_button.grid(row=2, column=2, padx=5, pady=5)
 
-        # Listbox to display objects on the token
-        self.objects_listbox = tk.Listbox(root, width=50, height=10)
-        self.objects_listbox.pack(pady=10)
+        # Text widget to display objects on the token
+        self.objects_text = tk.Text(root, width=50, height=10)
+        self.objects_text.grid(row=3, column=0, columnspan=3, pady=10)
 
         # PKCS#11 session variables
         self.pkcs11 = None
@@ -86,7 +86,11 @@ class TokenManagerApp:
 
     def generate_key(self):
         try:
-            key_label = "MyPersistentRSAKey"
+            # Get key label from the user
+            key_label = simpledialog.askstring("Key Generation", "Enter key label:", initialvalue="MyPersistentRSAKey")
+            if not key_label:
+                messagebox.showerror("Error", "Key label not provided")
+                return
             
             # Generate RSA key pair (public and private)
             pub_key, priv_key = self.session.generate_keypair(
@@ -139,13 +143,24 @@ class TokenManagerApp:
                 'public_key': rsa_pub_key
             })
 
+            # Get subject details from the user
+            country_name = simpledialog.askstring("CSR Subject", "Enter Country Name (e.g., US):", initialvalue="US")
+            state_name = simpledialog.askstring("CSR Subject", "Enter State or Province Name (e.g., California):", initialvalue="California")
+            locality_name = simpledialog.askstring("CSR Subject", "Enter Locality Name (e.g., San Francisco):", initialvalue="San Francisco")
+            organization_name = simpledialog.askstring("CSR Subject", "Enter Organization Name (e.g., My Company):", initialvalue="My Company")
+            common_name = simpledialog.askstring("CSR Subject", "Enter Common Name (e.g., example.com):", initialvalue="example.com")
+            
+            if not (country_name and state_name and locality_name and organization_name and common_name):
+                messagebox.showerror("Error", "Incomplete subject details")
+                return
+
             # Define subject for the CSR
-            subject = x509.Name.build({
-                'country_name': 'US',
-                'state_or_province_name': 'California',
-                'locality_name': 'San Francisco',
-                'organization_name': 'My Company',
-                'common_name': 'example.com'
+            subject = ac_x509.Name.build({
+                'country_name': country_name,
+                'state_or_province_name': state_name,
+                'locality_name': locality_name,
+                'organization_name': organization_name,
+                'common_name': common_name
             })
 
             # Build the CSR using asn1crypto
@@ -198,10 +213,16 @@ class TokenManagerApp:
             else:
                 cert_der = cert_data  # Already in DER format
 
+            # Prompt user for the label
+            cert_label = simpledialog.askstring("Certificate Label", "Enter a label for the certificate:")
+            if not cert_label:
+                messagebox.showerror("Error", "No label entered. Import canceled.")
+                return
+
             # Decode the certificate using python-pkcs11 utility function
             cert_obj = decode_x509_certificate(cert_der)
             cert_obj.update({
-                pkcs11.Attribute.LABEL: "MyCert",
+                pkcs11.Attribute.LABEL: cert_label,  # Use the user-provided label
                 pkcs11.Attribute.CLASS: pkcs11.ObjectClass.CERTIFICATE,
                 pkcs11.Attribute.CERTIFICATE_TYPE: pkcs11.CertificateType.X_509,
                 pkcs11.Attribute.TOKEN: True
@@ -210,19 +231,116 @@ class TokenManagerApp:
             # Create certificate object on the token
             created_cert = self.session.create_object(cert_obj)
             if created_cert:
-                messagebox.showinfo("Success", "Certificate Imported to Token!")
+                messagebox.showinfo("Success", f"Certificate Imported to Token with label '{cert_label}'!")
             else:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
 
+
+    from asn1crypto import x509 as ac_x509
+
+    from asn1crypto import x509 as ac_x509
+
+    def format_object_details(self, obj):
+        """Format details of a PKCS#11 object for display."""
+        try:
+            obj_class = obj[pkcs11.Attribute.CLASS]
+            label = obj[pkcs11.Attribute.LABEL]
+            obj_type = "Unknown"
+
+            if obj_class == pkcs11.ObjectClass.PUBLIC_KEY:
+                obj_type = "Public Key Object"
+                key_type = obj[pkcs11.Attribute.KEY_TYPE]
+                bits = obj[pkcs11.Attribute.MODULUS_BITS] if key_type == KeyType.RSA else 'N/A'
+                usage_flags = []
+
+                # Check each usage flag
+                try:
+                    if obj[pkcs11.Attribute.ENCRYPT]:
+                        usage_flags.append("encrypt")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.WRAP]:
+                        usage_flags.append("wrap")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.VERIFY]:
+                        usage_flags.append("verify")
+                except KeyError:
+                    pass
+
+                usage = ', '.join(usage_flags)
+                access = 'local' if obj[pkcs11.Attribute.TOKEN] else 'session'
+
+                return (f"{obj_type}; Algorithm: {key_type.name}, Bits: {bits}\n"
+                        f"  label:      {label}\n"
+                        f"  Usage:      {usage}\n"
+                        f"  Access:     {access}")
+
+            elif obj_class == pkcs11.ObjectClass.PRIVATE_KEY:
+                obj_type = "Private Key Object"
+                key_type = obj[pkcs11.Attribute.KEY_TYPE]
+                usage_flags = []
+
+                # Check each usage flag
+                try:
+                    if obj[pkcs11.Attribute.DECRYPT]:
+                        usage_flags.append("decrypt")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.SIGN]:
+                        usage_flags.append("sign")
+                except KeyError:
+                    pass
+                try:
+                    if obj[pkcs11.Attribute.UNWRAP]:
+                        usage_flags.append("unwrap")
+                except KeyError:
+                    pass
+
+                usage = ', '.join(usage_flags)
+                access = 'sensitive, always sensitive, never extractable' if obj[pkcs11.Attribute.SENSITIVE] else 'local'
+
+                return (f"{obj_type}; Algorithm: {key_type.name}\n"
+                        f"  label:      {label}\n"
+                        f"  Usage:      {usage}\n"
+                        f"  Access:     {access}")
+
+            elif obj_class == pkcs11.ObjectClass.CERTIFICATE:
+                obj_type = "Certificate Object"
+                cert_type = obj[pkcs11.Attribute.CERTIFICATE_TYPE]
+                cert_data = obj[pkcs11.Attribute.VALUE]
+
+                # Decode the certificate using asn1crypto
+                try:
+                    cert = ac_x509.Certificate.load(cert_data)
+                    subject = cert['tbs_certificate']['subject']
+                    
+                    # Convert subject from ASN.1 structure to a human-readable format
+                    subject_dn_str = ', '.join(f"{k}={v}" for k, v in subject.native.items())
+                    subject_dn_formatted = f"DN: {subject_dn_str}"
+                except Exception as e:
+                    subject_dn_formatted = f"Error decoding DN: {str(e)}"
+
+                return (f"{obj_type}; type = X.509 cert\n"
+                        f"  label:      {label}\n"
+                        f"  subject:    {subject_dn_formatted}")
+
+            else:
+                return f"Unknown Object Class: {obj_class}"
+        except KeyError as e:
+            return f"Missing attribute: {e}"
+
+    # Example usage in list_objects
     def list_objects(self):
         try:
-            # Clear the listbox before listing new objects
-            self.objects_listbox.delete(0, tk.END)
+            self.objects_text.delete(1.0, tk.END)
 
             for obj in self.session.get_objects():
-                label = obj[pkcs11.Attribute.LABEL]
-                obj_class = obj[pkcs11.Attribute.CLASS]
-                self.objects_listbox.insert(tk.END, f"{label} - {obj_class}")
+                details = self.format_object_details(obj)
+                self.objects_text.insert(tk.END, details + "\n\n")
         except pkcs11.PKCS11Error as e:
             messagebox.showerror("Error", f"Failed to list objects: {str(e)}")
 
