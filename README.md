@@ -15,11 +15,11 @@ A Python-based GUI application for managing PKCS#11 tokens using `tkinter`. Feat
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/a-farahani/Token-Manager.git
+    git clone https://github.com/a-farahani/TokenManager.git
     ```
 2. Navigate to the project directory:
     ```bash
-    cd Token-Manager
+    cd TokenManager
     ```
 3. Install the required Python packages:
     ```bash
