@@ -4,7 +4,7 @@ import pkcs11
 from pkcs11 import KeyType, Mechanism
 import pkcs11.util.rsa
 from cryptography import x509
-from asn1crypto import csr, keys, x509
+from asn1crypto import csr, keys, x509 as ac_x509
 from asn1crypto.keys import RSAPublicKey
 from asn1crypto import pem
 from pkcs11.util.x509 import decode_x509_certificate
@@ -86,7 +86,11 @@ class TokenManagerApp:
 
     def generate_key(self):
         try:
-            key_label = "MyPersistentRSAKey"
+            # Get key label from the user
+            key_label = simpledialog.askstring("Key Generation", "Enter key label:", initialvalue="MyPersistentRSAKey")
+            if not key_label:
+                messagebox.showerror("Error", "Key label not provided")
+                return
             
             # Generate RSA key pair (public and private)
             pub_key, priv_key = self.session.generate_keypair(
@@ -139,13 +143,24 @@ class TokenManagerApp:
                 'public_key': rsa_pub_key
             })
 
+            # Get subject details from the user
+            country_name = simpledialog.askstring("CSR Subject", "Enter Country Name (e.g., US):", initialvalue="US")
+            state_name = simpledialog.askstring("CSR Subject", "Enter State or Province Name (e.g., California):", initialvalue="California")
+            locality_name = simpledialog.askstring("CSR Subject", "Enter Locality Name (e.g., San Francisco):", initialvalue="San Francisco")
+            organization_name = simpledialog.askstring("CSR Subject", "Enter Organization Name (e.g., My Company):", initialvalue="My Company")
+            common_name = simpledialog.askstring("CSR Subject", "Enter Common Name (e.g., example.com):", initialvalue="example.com")
+            
+            if not (country_name and state_name and locality_name and organization_name and common_name):
+                messagebox.showerror("Error", "Incomplete subject details")
+                return
+
             # Define subject for the CSR
-            subject = x509.Name.build({
-                'country_name': 'US',
-                'state_or_province_name': 'California',
-                'locality_name': 'San Francisco',
-                'organization_name': 'My Company',
-                'common_name': 'example.com'
+            subject = ac_x509.Name.build({
+                'country_name': country_name,
+                'state_or_province_name': state_name,
+                'locality_name': locality_name,
+                'organization_name': organization_name,
+                'common_name': common_name
             })
 
             # Build the CSR using asn1crypto
@@ -198,10 +213,16 @@ class TokenManagerApp:
             else:
                 cert_der = cert_data  # Already in DER format
 
+            # Prompt user for the label
+            cert_label = simpledialog.askstring("Certificate Label", "Enter a label for the certificate:")
+            if not cert_label:
+                messagebox.showerror("Error", "No label entered. Import canceled.")
+                return
+
             # Decode the certificate using python-pkcs11 utility function
             cert_obj = decode_x509_certificate(cert_der)
             cert_obj.update({
-                pkcs11.Attribute.LABEL: "MyCert",
+                pkcs11.Attribute.LABEL: cert_label,  # Use the user-provided label
                 pkcs11.Attribute.CLASS: pkcs11.ObjectClass.CERTIFICATE,
                 pkcs11.Attribute.CERTIFICATE_TYPE: pkcs11.CertificateType.X_509,
                 pkcs11.Attribute.TOKEN: True
@@ -210,9 +231,10 @@ class TokenManagerApp:
             # Create certificate object on the token
             created_cert = self.session.create_object(cert_obj)
             if created_cert:
-                messagebox.showinfo("Success", "Certificate Imported to Token!")
+                messagebox.showinfo("Success", f"Certificate Imported to Token with label '{cert_label}'!")
             else:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
+
 
     def list_objects(self):
         try:
