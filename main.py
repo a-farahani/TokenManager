@@ -37,9 +37,9 @@ class TokenManagerApp:
         self.list_objects_button = tk.Button(root, text="List Objects", command=self.list_objects, state=tk.DISABLED)
         self.list_objects_button.pack(pady=5)
 
-        # Listbox to display objects on the token
-        self.objects_listbox = tk.Listbox(root, width=50, height=10)
-        self.objects_listbox.pack(pady=10)
+        # Text widget to display objects on the token
+        self.objects_text = tk.Text(root, width=80, height=15)
+        self.objects_text.pack(pady=10)
 
         # PKCS#11 session variables
         self.pkcs11 = None
@@ -236,6 +236,10 @@ class TokenManagerApp:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
 
 
+    from asn1crypto import x509 as ac_x509
+
+    from asn1crypto import x509 as ac_x509
+
     def format_object_details(self, obj):
         """Format details of a PKCS#11 object for display."""
         try:
@@ -307,13 +311,22 @@ class TokenManagerApp:
             elif obj_class == pkcs11.ObjectClass.CERTIFICATE:
                 obj_type = "Certificate Object"
                 cert_type = obj[pkcs11.Attribute.CERTIFICATE_TYPE]
-                subject = obj[pkcs11.Attribute.SUBJECT]
-                # Assuming subject is a bytes object and needs to be decoded
-                subject_dn = subject.decode('utf-8') if isinstance(subject, bytes) else subject
-                
-                return (f"{obj_type}; type = {cert_type.name}\n"
+                cert_data = obj[pkcs11.Attribute.VALUE]
+
+                # Decode the certificate using asn1crypto
+                try:
+                    cert = ac_x509.Certificate.load(cert_data)
+                    subject = cert['tbs_certificate']['subject']
+                    
+                    # Convert subject from ASN.1 structure to a human-readable format
+                    subject_dn_str = ', '.join(f"{k}={v}" for k, v in subject.native.items())
+                    subject_dn_formatted = f"DN: {subject_dn_str}"
+                except Exception as e:
+                    subject_dn_formatted = f"Error decoding DN: {str(e)}"
+
+                return (f"{obj_type}; type = X.509 cert\n"
                         f"  label:      {label}\n"
-                        f"  subject:    DN: {subject_dn}")
+                        f"  subject:    {subject_dn_formatted}")
 
             else:
                 return f"Unknown Object Class: {obj_class}"
@@ -322,14 +335,14 @@ class TokenManagerApp:
 
     # Example usage in list_objects
     def list_objects(self):
-        # try:
-            self.objects_listbox.delete(0, tk.END)
+        try:
+            self.objects_text.delete(1.0, tk.END)
 
             for obj in self.session.get_objects():
                 details = self.format_object_details(obj)
-                self.objects_listbox.insert(tk.END, details)
-        # except pkcs11.PKCS11Error as e:
-        #     messagebox.showerror("Error", f"Failed to list objects: {str(e)}")
+                self.objects_text.insert(tk.END, details + "\n\n")
+        except pkcs11.PKCS11Error as e:
+            messagebox.showerror("Error", f"Failed to list objects: {str(e)}")
 
 if __name__ == "__main__":
     root = tk.Tk()
