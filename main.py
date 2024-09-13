@@ -1,11 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox, filedialog, simpledialog
 import pkcs11
-from pkcs11 import Token, KeyType, Mechanism
+from pkcs11 import KeyType, Mechanism
 import pkcs11.util.rsa
-from cryptography.hazmat.backends import default_backend
-from cryptography import x509 as crypto_x509
-from cryptography.hazmat.primitives import serialization
+from cryptography import x509
 from asn1crypto import csr, keys, x509
 from asn1crypto.keys import RSAPublicKey
 from asn1crypto import pem
