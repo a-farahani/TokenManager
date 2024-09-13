@@ -32,7 +32,7 @@ A Python-based GUI application for managing PKCS#11 tokens using `tkinter`. Feat
 
 1. Run the application:
     ```bash
-    python token_manager.py
+    python main.py
     ```
 2. Use the GUI to perform various operations with your PKCS#11 token.
 
