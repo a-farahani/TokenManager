@@ -16,30 +16,30 @@ class TokenManagerApp:
 
         # Label to display token status
         self.token_label = tk.Label(root, text="Token Not Detected")
-        self.token_label.pack(pady=10)
+        self.token_label.grid(row=0, column=0, columnspan=3, pady=10)
 
         # Buttons for various operations
-        self.detect_token_button = tk.Button(root, text="Detect Token", command=self.detect_token)
-        self.detect_token_button.pack(pady=5)
+        self.detect_token_button = tk.Button(root, text="Detect Token", command=self.detect_token, width=20)
+        self.detect_token_button.grid(row=1, column=0, padx=5, pady=5)
 
-        self.login_button = tk.Button(root, text="Login", command=self.login_token, state=tk.DISABLED)
-        self.login_button.pack(pady=5)
+        self.login_button = tk.Button(root, text="Login", command=self.login_token, state=tk.DISABLED, width=20)
+        self.login_button.grid(row=2, column=0, padx=5, pady=5)
 
-        self.generate_key_button = tk.Button(root, text="Generate Key", command=self.generate_key, state=tk.DISABLED)
-        self.generate_key_button.pack(pady=5)
+        self.generate_key_button = tk.Button(root, text="Generate Key", command=self.generate_key, state=tk.DISABLED, width=20)
+        self.generate_key_button.grid(row=1, column=1, padx=5, pady=5)
 
-        self.generate_csr_button = tk.Button(root, text="Generate CSR", command=self.generate_csr, state=tk.DISABLED)
-        self.generate_csr_button.pack(pady=5)
+        self.generate_csr_button = tk.Button(root, text="Generate CSR", command=self.generate_csr, state=tk.DISABLED, width=20)
+        self.generate_csr_button.grid(row=2, column=1, padx=5, pady=5)
 
-        self.import_cert_button = tk.Button(root, text="Import Certificate", command=self.import_cert, state=tk.DISABLED)
-        self.import_cert_button.pack(pady=5)
+        self.import_cert_button = tk.Button(root, text="Import Certificate", command=self.import_cert, state=tk.DISABLED, width=20)
+        self.import_cert_button.grid(row=1, column=2, padx=5, pady=5)
 
-        self.list_objects_button = tk.Button(root, text="List Objects", command=self.list_objects, state=tk.DISABLED)
-        self.list_objects_button.pack(pady=5)
+        self.list_objects_button = tk.Button(root, text="List Objects", command=self.list_objects, state=tk.DISABLED, width=20)
+        self.list_objects_button.grid(row=2, column=2, padx=5, pady=5)
 
         # Text widget to display objects on the token
-        self.objects_text = tk.Text(root, width=80, height=15)
-        self.objects_text.pack(pady=10)
+        self.objects_text = tk.Text(root, width=50, height=10)
+        self.objects_text.grid(row=3, column=0, columnspan=3, pady=10)
 
         # PKCS#11 session variables
         self.pkcs11 = None
