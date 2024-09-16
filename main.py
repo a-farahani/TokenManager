@@ -253,17 +253,19 @@ class TokenManagerApp:
             else:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
 
-
-    from asn1crypto import x509 as ac_x509
-
-    from asn1crypto import x509 as ac_x509
-
     def format_object_details(self, obj):
         """Format details of a PKCS#11 object for display."""
         try:
             obj_class = obj[pkcs11.Attribute.CLASS]
             label = obj[pkcs11.Attribute.LABEL]
             obj_type = "Unknown"
+            obj_id = None
+
+            try:
+                # Try to retrieve the ID (UUID) if it exists
+                obj_id = obj[pkcs11.Attribute.ID].hex()
+            except KeyError:
+                obj_id = "No ID"
 
             if obj_class == pkcs11.ObjectClass.PUBLIC_KEY:
                 obj_type = "Public Key Object"
@@ -271,7 +273,6 @@ class TokenManagerApp:
                 bits = obj[pkcs11.Attribute.MODULUS_BITS] if key_type == KeyType.RSA else 'N/A'
                 usage_flags = []
 
-                # Check each usage flag
                 try:
                     if obj[pkcs11.Attribute.ENCRYPT]:
                         usage_flags.append("encrypt")
@@ -293,6 +294,7 @@ class TokenManagerApp:
 
                 return (f"{obj_type}; Algorithm: {key_type.name}, Bits: {bits}\n"
                         f"  label:      {label}\n"
+                        f"  ID:         {obj_id}\n"
                         f"  Usage:      {usage}\n"
                         f"  Access:     {access}")
 
@@ -301,7 +303,6 @@ class TokenManagerApp:
                 key_type = obj[pkcs11.Attribute.KEY_TYPE]
                 usage_flags = []
 
-                # Check each usage flag
                 try:
                     if obj[pkcs11.Attribute.DECRYPT]:
                         usage_flags.append("decrypt")
@@ -323,6 +324,7 @@ class TokenManagerApp:
 
                 return (f"{obj_type}; Algorithm: {key_type.name}\n"
                         f"  label:      {label}\n"
+                        f"  ID:         {obj_id}\n"
                         f"  Usage:      {usage}\n"
                         f"  Access:     {access}")
 
@@ -331,12 +333,9 @@ class TokenManagerApp:
                 cert_type = obj[pkcs11.Attribute.CERTIFICATE_TYPE]
                 cert_data = obj[pkcs11.Attribute.VALUE]
 
-                # Decode the certificate using asn1crypto
                 try:
                     cert = ac_x509.Certificate.load(cert_data)
                     subject = cert['tbs_certificate']['subject']
-                    
-                    # Convert subject from ASN.1 structure to a human-readable format
                     subject_dn_str = ', '.join(f"{k}={v}" for k, v in subject.native.items())
                     subject_dn_formatted = f"DN: {subject_dn_str}"
                 except Exception as e:
@@ -344,10 +343,11 @@ class TokenManagerApp:
 
                 return (f"{obj_type}; type = X.509 cert\n"
                         f"  label:      {label}\n"
+                        f"  ID:         {obj_id}\n"
                         f"  subject:    {subject_dn_formatted}")
 
             else:
-                return f"Unknown Object Class: {obj_class}"
+                return f"Unknown Object Class: {obj_class}\nID: {obj_id}"
         except KeyError as e:
             return f"Missing attribute: {e}"
 
