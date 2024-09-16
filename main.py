@@ -3,11 +3,11 @@ from tkinter import messagebox, filedialog, simpledialog
 import pkcs11
 from pkcs11 import KeyType, Mechanism
 import pkcs11.util.rsa
-from cryptography import x509
 from asn1crypto import csr, keys, x509 as ac_x509
 from asn1crypto.keys import RSAPublicKey
 from asn1crypto import pem
 from pkcs11.util.x509 import decode_x509_certificate
+import uuid
 
 class TokenManagerApp:
     def __init__(self, root):
@@ -92,6 +92,9 @@ class TokenManagerApp:
                 messagebox.showerror("Error", "Key label not provided")
                 return
             
+            # Generate a UUID for the key pair
+            key_uuid = uuid.uuid4()
+
             # Generate RSA key pair (public and private)
             pub_key, priv_key = self.session.generate_keypair(
                 KeyType.RSA, 
@@ -101,16 +104,18 @@ class TokenManagerApp:
                     pkcs11.Attribute.LABEL: key_label,
                     pkcs11.Attribute.TOKEN: True,
                     pkcs11.Attribute.PUBLIC_EXPONENT: (0x01, 0x00, 0x01),  # e = 65537
+                    pkcs11.Attribute.ID: key_uuid.bytes  # Set the UUID as the key ID
                 },
                 private_template={
                     pkcs11.Attribute.LABEL: key_label,
                     pkcs11.Attribute.TOKEN: True,
                     pkcs11.Attribute.SENSITIVE: True,
                     pkcs11.Attribute.PRIVATE: True,
+                    pkcs11.Attribute.ID: key_uuid.bytes  # Set the UUID as the key ID
                 }
             )
             
-            messagebox.showinfo("Success", f"RSA Key Pair Generated!\nLabel: {key_label}")
+            messagebox.showinfo("Success", f"RSA Key Pair Generated!\nLabel: {key_label}\nUUID: {key_uuid}")
         except pkcs11.PKCS11Error as e:
             messagebox.showerror("Error", f"Failed to generate key: {str(e)}")
 
@@ -213,11 +218,23 @@ class TokenManagerApp:
             else:
                 cert_der = cert_data  # Already in DER format
 
-            # Prompt user for the label
+            # Try to find the UUID from the key pair to suggest for the certificate
+            try:
+                priv_key = self.session.get_key(pkcs11.ObjectClass.PRIVATE_KEY)
+                key_uuid = priv_key[pkcs11.Attribute.ID]
+                cert_uuid = uuid.UUID(bytes=key_uuid)  # Convert the bytes back to UUID
+            except KeyError:
+                cert_uuid = None
+
+            # Prompt user for the label and UUID
             cert_label = simpledialog.askstring("Certificate Label", "Enter a label for the certificate:")
-            if not cert_label:
-                messagebox.showerror("Error", "No label entered. Import canceled.")
+            suggested_uuid = cert_uuid or uuid.uuid4()
+            cert_id = simpledialog.askstring("Certificate ID", "Enter UUID for the certificate (suggested):", initialvalue=str(suggested_uuid))
+            if not cert_label or not cert_id:
+                messagebox.showerror("Error", "No label or UUID entered. Import canceled.")
                 return
+
+            cert_uuid = uuid.UUID(cert_id)  # Convert the entered string back to a UUID object
 
             # Decode the certificate using python-pkcs11 utility function
             cert_obj = decode_x509_certificate(cert_der)
@@ -225,13 +242,14 @@ class TokenManagerApp:
                 pkcs11.Attribute.LABEL: cert_label,  # Use the user-provided label
                 pkcs11.Attribute.CLASS: pkcs11.ObjectClass.CERTIFICATE,
                 pkcs11.Attribute.CERTIFICATE_TYPE: pkcs11.CertificateType.X_509,
-                pkcs11.Attribute.TOKEN: True
+                pkcs11.Attribute.TOKEN: True,
+                pkcs11.Attribute.ID: cert_uuid.bytes  # Use the provided or suggested UUID
             })
 
             # Create certificate object on the token
             created_cert = self.session.create_object(cert_obj)
             if created_cert:
-                messagebox.showinfo("Success", f"Certificate Imported to Token with label '{cert_label}'!")
+                messagebox.showinfo("Success", f"Certificate Imported to Token with label '{cert_label}' and UUID '{cert_uuid}'!")
             else:
                 messagebox.showerror("Error", "Failed to store certificate in token.")
 
